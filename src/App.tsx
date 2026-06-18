@@ -1,5 +1,6 @@
+// src/App.tsx — Professional Enterprise Layout
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 import { useAuth } from './contexts/AuthContext';
@@ -16,7 +17,8 @@ import KeywordResearch from './pages/KeywordResearch';
 import ContentPlanner from './pages/ContentPlanner';
 
 export default function App() {
-  const { isAdmin, signOut, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
+  const location = useLocation();
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const { apiKey } = useApiKeys();
 
@@ -26,53 +28,66 @@ export default function App() {
       setIsKeyModalOpen(true);
     }
   }, [profile, isAdmin, apiKey]);
+  
+  // Hide sidebar on auth pages
+  const isAuthPage = ['/login', '/register'].includes(location.pathname);
 
-
+  if (isAuthPage) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        {/* Auth routes are handled by main.tsx */}
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-900 text-slate-50 font-sans" dir="rtl">
-      {/* Premium Aurora Background */}
-      <div className="aurora-bg fixed inset-0 z-0">
-        <div className="aurora-1"></div>
-        <div className="aurora-2"></div>
-        <div className="aurora-3"></div>
-      </div>
-
-      <Sidebar 
-        isAdmin={isAdmin}
-        onSettingsClick={() => setIsKeyModalOpen(true)}
-        onSignOut={signOut}
-      />
+    <div className="min-h-screen bg-gray-50 flex" dir="rtl">
+      {/* Sidebar */}
+      {user && <Sidebar isAdmin={isAdmin} onSettingsClick={() => setIsKeyModalOpen(true)} />}
       
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 transition-all duration-300 mr-20 lg:mr-[280px]">
-        <TopNav 
-          isAdmin={isAdmin} 
-          onSettingsClick={() => setIsKeyModalOpen(true)} 
-          onSignOut={signOut}
-        />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopNav />
         
-        <main className="flex-1 overflow-y-auto px-4 py-8 md:px-8">
-          <div className="max-w-6xl mx-auto animate-fade-in-up">
+        <main className="flex-1 p-6 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
             <ErrorBoundary fallbackTitle="حدث خطأ في تحميل الصفحة">
-            <Routes>
-              <Route path="/" element={<ProductGenerator />} />
-              <Route path="/articles" element={<ArticleGenerator />} />
-              <Route path="/bulk" element={<BulkGenerator />} />
-              <Route path="/keywords" element={<KeywordResearch />} />
-              <Route path="/planner" element={<ContentPlanner />} />
-              <Route path="/analyzer" element={<CompetitorAnalyzer />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+              <Routes>
+                {/* Routes from both old App.tsx and new Sidebar links */}
+                <Route path="/" element={<ProductGenerator />} />
+                <Route path="/product" element={<ProductGenerator />} />
+                
+                <Route path="/articles" element={<ArticleGenerator />} />
+                <Route path="/article" element={<ArticleGenerator />} />
+                
+                <Route path="/bulk" element={<BulkGenerator />} />
+                <Route path="/keywords" element={<KeywordResearch />} />
+                
+                <Route path="/planner" element={<ContentPlanner />} />
+                <Route path="/content-plan" element={<ContentPlanner />} />
+                
+                <Route path="/analyzer" element={<CompetitorAnalyzer />} />
+                <Route path="/analyze" element={<CompetitorAnalyzer />} />
+                <Route path="/competitors" element={<CompetitorAnalyzer />} />
+                
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </ErrorBoundary>
           </div>
         </main>
+        
+        {/* Footer */}
+        <footer className="h-12 border-t border-gray-200 bg-white flex items-center justify-between px-6 text-xs text-gray-400">
+          <span>SEO Pro © 2026</span>
+          <span>منصة تحسين محركات البحث والمحتوى</span>
+        </footer>
       </div>
 
       <ApiKeyModal
-          isOpen={isKeyModalOpen}
-          onClose={() => setIsKeyModalOpen(false)}
-          onSave={() => {}}
-        />
+        isOpen={isKeyModalOpen}
+        onClose={() => setIsKeyModalOpen(false)}
+        onSave={() => {}}
+      />
     </div>
   );
 }

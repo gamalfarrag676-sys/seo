@@ -7,6 +7,8 @@ export interface SEOContent {
   mainContent: string;
   altText: string;
   tags?: string[];
+  urlSlug?: string;
+  keywords?: string;
 }
 
 export type ContentStyle = 'expert' | 'simple';

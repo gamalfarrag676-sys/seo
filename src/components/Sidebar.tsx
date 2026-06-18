@@ -1,281 +1,213 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Home, FileText, Package, Search, Map, Globe,
-  Crown, User, Settings, LogOut, ChevronLeft, ChevronRight,
-  Sparkles, X, Menu
-} from 'lucide-react';
+// src/components/Sidebar.tsx — Professional Enterprise Sidebar
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-interface SidebarProps {
-  isAdmin: boolean;
-  onSettingsClick: () => void;
-  onSignOut: () => void;
-}
+// Heroicons-style SVG icons (clean, not AI-looking)
+const icons = {
+  home: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  ),
+  product: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
+  ),
+  article: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+  ),
+  bulk: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+  ),
+  analyze: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+  ),
+  competitor: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  ),
+  keywords: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>
+  ),
+  plan: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+  ),
+  history: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+  ),
+  editor: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  ),
+  settings: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+  ),
+  admin: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+  ),
+  profile: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  ),
+  logout: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+  ),
+  menu: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+  ),
+  logo: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  ),
+};
 
-interface NavItem {
-  icon: React.ElementType;
-  label: string;
-  route?: string;
-  onClick?: () => void;
-  adminOnly?: boolean;
-  isDivider?: boolean;
-  variant?: 'default' | 'danger';
-}
+const navItems = [
+  { to: '/', icon: icons.home, label: 'الرئيسية' },
+  { to: '/product', icon: icons.product, label: 'مولد المنتجات' },
+  { to: '/article', icon: icons.article, label: 'مولد المقالات' },
+  { to: '/bulk', icon: icons.bulk, label: 'التوليد الجماعي' },
+];
 
-export const Sidebar: React.FC<SidebarProps> = ({ isAdmin, onSettingsClick, onSignOut }) => {
-  const navigate = useNavigate();
+const analysisItems = [
+  { to: '/analyze', icon: icons.analyze, label: 'تحليل SEO' },
+  { to: '/competitors', icon: icons.competitor, label: 'تحليل المنافسين' },
+  { to: '/keywords', icon: icons.keywords, label: 'الكلمات المفتاحية' },
+  { to: '/content-plan', icon: icons.plan, label: 'مخطط المحتوى' },
+];
+
+const toolItems = [
+  { to: '/history', icon: icons.history, label: 'السجل' },
+  { to: '/editor', icon: icons.editor, label: 'المحرر المباشر' },
+];
+
+export function Sidebar({ isAdmin, onSettingsClick, onSignOut }: { isAdmin?: boolean, onSettingsClick?: () => void, onSignOut?: () => void }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const { profile, signOut } = useAuth();
   const location = useLocation();
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile breakpoint
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth >= 1024) {
-        setIsMobileOpen(false);
-      }
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    if (isMobile) {
-      setIsMobileOpen(false);
-    }
-  }, [location.pathname, isMobile]);
-
-  const handleNavigate = useCallback((route: string) => {
-    navigate(route);
-    if (isMobile) {
-      setIsMobileOpen(false);
-    }
-  }, [navigate, isMobile]);
-
-  const handleSettingsClick = useCallback(() => {
-    onSettingsClick();
-    if (isMobile) {
-      setIsMobileOpen(false);
-    }
-  }, [onSettingsClick, isMobile]);
-
-  const handleSignOut = useCallback(() => {
-    onSignOut();
-    if (isMobile) {
-      setIsMobileOpen(false);
-    }
-  }, [onSignOut, isMobile]);
-
-  // Navigation items configuration
-  const navItems: NavItem[] = [
-    { icon: Home, label: 'مولد المنتجات', route: '/' },
-    { icon: FileText, label: 'مولد المقالات', route: '/articles' },
-    { icon: Package, label: 'التوليد الجماعي', route: '/bulk' },
-    { icon: Search, label: 'الكلمات المفتاحية', route: '/keywords' },
-    { icon: Map, label: 'مخطط المحتوى', route: '/planner' },
-    { icon: Globe, label: 'محلل المنافسين', route: '/analyzer' },
-    // Divider
-    { icon: Home, label: '', isDivider: true },
-    // Admin & user items
-    { icon: Crown, label: 'لوحة التحكم', route: '/admin', adminOnly: true },
-    { icon: User, label: 'الملف الشخصي', route: '/profile' },
-    { icon: Settings, label: 'الإعدادات', onClick: handleSettingsClick },
-    { icon: LogOut, label: 'تسجيل خروج', onClick: handleSignOut, variant: 'danger' },
-  ];
-
-  const isActiveRoute = (route?: string): boolean => {
-    if (!route) return false;
-    if (route === '/') return location.pathname === '/';
-    return location.pathname.startsWith(route);
-  };
-
-  const renderNavItem = (item: NavItem, index: number) => {
-    // Skip admin-only items for non-admin users
-    if (item.adminOnly && !isAdmin) return null;
-
-    // Render divider
-    if (item.isDivider) {
-      return (
-        <div key={`divider-${index}`} className="my-2 mx-3">
-          <div className="h-px bg-gradient-to-l from-transparent via-slate-700/50 to-transparent" />
-        </div>
-      );
-    }
-
-    const Icon = item.icon;
-    const isActive = isActiveRoute(item.route);
-    const isDanger = item.variant === 'danger';
-
-    const handleClick = () => {
-      if (item.onClick) {
-        item.onClick();
-      } else if (item.route) {
-        handleNavigate(item.route);
-      }
-    };
-
-    return (
-      <button
-        key={item.route || item.label}
-        onClick={handleClick}
-        title={item.label}
-        className={`
-          group relative w-full flex items-center gap-3 rounded-xl transition-all duration-200
-          ${isExpanded || isMobileOpen ? 'px-4 py-3' : 'px-0 py-3 justify-center'}
-          ${isActive
-            ? 'bg-indigo-600 text-white shadow-sm'
-            : isDanger
-              ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }
-        `}
-      >
-        {/* Active indicator bar */}
-        {isActive && (
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white/80 rounded-l-full" />
-        )}
-
-        <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${
-          isActive ? 'text-white' : isDanger ? 'group-hover:text-red-400' : 'group-hover:text-indigo-400'
-        }`} />
-
-        {/* Label - visible when expanded or mobile */}
-        {(isExpanded || isMobileOpen) && (
-          <span className={`text-sm font-semibold whitespace-nowrap transition-opacity duration-200 ${
-            isActive ? 'text-white' : ''
-          }`}>
-            {item.label}
-          </span>
-        )}
-
-        {/* Tooltip for collapsed state */}
-        {!isExpanded && !isMobileOpen && (
-          <div className="
-            absolute right-full mr-3 px-3 py-1.5 rounded-lg
-            bg-slate-800 text-white text-xs font-semibold whitespace-nowrap
-            opacity-0 pointer-events-none group-hover:opacity-100
-            transition-opacity duration-200 shadow-xl border border-slate-700/50
-            z-50
-          ">
-            {item.label}
-            {/* Tooltip arrow */}
-            <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-slate-800" />
-          </div>
-        )}
-      </button>
-    );
-  };
-
-  // Sidebar content (shared between desktop and mobile)
-  const sidebarContent = (
-    <div className="flex flex-col h-full">
-      {/* Logo / Brand */}
-      <div className={`flex items-center gap-3 p-4 mb-2 ${isExpanded || isMobileOpen ? '' : 'justify-center'}`}>
-        <div className="p-2 bg-indigo-600 rounded-xl flex-shrink-0 shadow-sm">
-          <Sparkles className="w-5 h-5 text-white" />
-        </div>
-        {(isExpanded || isMobileOpen) && (
-          <div className="flex flex-col overflow-hidden">
-            <span className="font-black text-sm gradient-text leading-tight">SEO Generator</span>
-            <span className="text-[10px] text-slate-500 font-medium">مولد المحتوى الذكي</span>
-          </div>
-        )}
-
-        {/* Close button for mobile */}
-        {isMobile && isMobileOpen && (
-          <button
-            onClick={() => setIsMobileOpen(false)}
-            className="mr-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-
-      {/* Navigation Items */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {navItems.map(renderNavItem)}
-      </nav>
-
-      {/* Toggle button (desktop only) */}
-      {!isMobile && (
-        <div className="p-3 mt-auto border-t border-slate-800/50">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-              text-slate-500 hover:text-white hover:bg-slate-800/50 transition-all duration-200"
-            title={isExpanded ? 'طي القائمة' : 'توسيع القائمة'}
-          >
-            {isExpanded ? (
-              <>
-                <ChevronLeft className="w-4 h-4" />
-                <span className="text-xs font-semibold">طي القائمة</span>
-              </>
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  const isActive = (path: string) => location.pathname === path;
 
   return (
-    <>
-      {/* Mobile hamburger trigger */}
-      {isMobile && (
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="fixed top-4 right-4 z-40 p-2.5 rounded-xl
-            bg-slate-900/80 backdrop-blur-xl border border-slate-700/50
-            text-slate-300 hover:text-white hover:border-indigo-500/30
-            transition-all duration-200 shadow-xl"
-          title="فتح القائمة"
+    <aside 
+      className={`nav-sidebar flex flex-col h-screen sticky top-0 transition-all duration-300 shrink-0 ${
+        collapsed ? 'w-20' : 'w-64'
+      }`}
+    >
+      {/* Logo */}
+      <div className="h-16 flex items-center px-4 border-b border-gray-200">
+        <div className="flex items-center gap-3 text-primary-600">
+          {icons.logo}
+          {!collapsed && (
+            <div>
+              <span className="font-bold text-lg text-gray-900">SEO Pro</span>
+              <span className="text-xs text-gray-400 block -mt-1">منصة تحسين المحتوى</span>
+            </div>
+          )}
+        </div>
+        <button 
+          onClick={() => setCollapsed(!collapsed)}
+          className="mr-auto p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
         >
-          <Menu className="w-5 h-5" />
+          {icons.menu}
         </button>
-      )}
+      </div>
 
-      {/* Mobile backdrop */}
-      {isMobile && isMobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300"
-          onClick={() => setIsMobileOpen(false)}
-        />
-      )}
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+        {/* Main */}
+        <div>
+          {!collapsed && (
+            <div className="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              الرئيسية
+            </div>
+          )}
+          {navItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`nav-item ${isActive(item.to) ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+            >
+              {item.icon}
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          ))}
+        </div>
 
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 right-0 z-50 h-screen
-          transition-all duration-300 ease-in-out
-          ${isMobile
-            ? `${isMobileOpen ? 'translate-x-0' : 'translate-x-full'} w-[280px]`
-            : `${isExpanded ? 'w-[280px]' : 'w-[72px]'}`
-          }
-        `}
-        style={{
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(40px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(40px) saturate(150%)',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.05)',
-          boxShadow: '-10px 0 40px -10px rgba(0, 0, 0, 0.3), inset 1px 0 0 rgba(255, 255, 255, 0.05)',
-        }}
-      >
-        {sidebarContent}
-      </aside>
+        {/* Analysis */}
+        <div>
+          {!collapsed && (
+            <div className="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              التحليلات
+            </div>
+          )}
+          {analysisItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`nav-item ${isActive(item.to) ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+            >
+              {item.icon}
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          ))}
+        </div>
 
-      {/* Spacer for desktop layout to push content */}
-      {!isMobile && (
-        <div
-          className="flex-shrink-0 transition-all duration-300"
-          style={{ width: isExpanded ? 280 : 72 }}
-        />
-      )}
-    </>
+        {/* Tools */}
+        <div>
+          {!collapsed && (
+            <div className="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              الأدوات
+            </div>
+          )}
+          {toolItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`nav-item ${isActive(item.to) ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+            >
+              {item.icon}
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-gray-200 space-y-1">
+        {profile && (
+          <>
+            <NavLink
+              to="/profile"
+              className={`nav-item ${isActive('/profile') ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+            >
+              {icons.profile}
+              {!collapsed && <span>الملف الشخصي</span>}
+            </NavLink>
+            
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={`nav-item ${isActive('/admin') ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`}
+              >
+                {icons.admin}
+                {!collapsed && <span>لوحة التحكم</span>}
+              </NavLink>
+            )}
+
+            {onSettingsClick && (
+              <button
+                onClick={onSettingsClick}
+                className={`nav-item w-full ${collapsed ? 'justify-center' : ''}`}
+              >
+                {icons.settings}
+                {!collapsed && <span>الإعدادات</span>}
+              </button>
+            )}
+
+            <button
+              onClick={onSignOut || signOut}
+              className={`nav-item w-full text-error hover:bg-error-light ${collapsed ? 'justify-center' : ''}`}
+            >
+              {icons.logout}
+              {!collapsed && <span>تسجيل الخروج</span>}
+            </button>
+          </>
+        )}
+      </div>
+    </aside>
   );
-};
+}
