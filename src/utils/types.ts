@@ -2,12 +2,11 @@
 
 export interface SEOContent {
   h1Title: string;
-  mainContent: string;
-  keywords: string;
   metaTitle: string;
   metaDescription: string;
-  urlSlug: string;
+  mainContent: string;
   altText: string;
+  tags?: string[];
 }
 
 export type ContentStyle = 'expert' | 'simple';
