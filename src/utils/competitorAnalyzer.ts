@@ -335,37 +335,61 @@ async function callAI(prompt: string, apiKey: string, provider: 'gemini' | 'open
   } finally { clearTimeout(timeoutId); }
 }
 
-async function extractTrueSEOKeywordsWithAI(competitors: any[], apiKey: string, provider: 'gemini' | 'openai'): Promise<Record<string, { keyword: string, volume: string, difficulty: number, intent: string, cpc: string }[]>> {
-  if (competitors.length === 0) return {};
+interface AIFullAnalysis {
+  keywords: Record<string, { keyword: string, volume: string, difficulty: number, intent: string, cpc: string }[]>;
+  serpFeatures: SERPFeature[];
+  searchIntent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  backlinkGaps: { domain: string; authority: number; linksToCompetitor: number; linksToYou: number; opportunity: 'high' | 'medium' | 'low' }[];
+}
+
+async function runFullAIAnalysis(competitors: any[], targetKeyword: string, apiKey: string, provider: 'gemini' | 'openai'): Promise<AIFullAnalysis> {
+  const defaultResult: AIFullAnalysis = {
+    keywords: {},
+    serpFeatures: [
+      { type: 'featured_snippet', present: false },
+      { type: 'people_also_ask', present: true },
+      { type: 'video', present: false },
+      { type: 'image_pack', present: true },
+      { type: 'local_pack', present: false },
+      { type: 'shopping', present: false }
+    ],
+    searchIntent: 'informational',
+    backlinkGaps: []
+  };
+  if (competitors.length === 0) return defaultResult;
   
   const prompt = `
-You are an expert Semantic SEO Analyst matching SEMrush capabilities.
-I have scraped e-commerce and blog websites in Saudi Arabia. Often, TF-IDF extracts UI words like "عرض المزيد".
-Strictly IGNORE UI/navigation/stop text.
-Extract the TRUE Top 50 SEO keywords each domain is actually targeting and ranking for, based on their title, H1, and word context.
-Provide:
-1. Realistic monthly Search Volume (e.g. "15K", "800").
-2. Keyword Difficulty (1-100).
-3. Search Intent ("informational", "navigational", "commercial", "transactional").
-4. CPC (e.g. "$1.20", "$0.50").
+You are an expert SEO analyst combining the capabilities of SEMrush + Ahrefs.
+Analyze the following scraped competitor data for the target keyword "${targetKeyword}" in Saudi Arabia.
 
 Competitors Data:
 ${JSON.stringify(competitors, null, 2)}
 
-Respond ONLY with a JSON format mapping each domain to its top 50 keywords.
-Format exactly like this:
-{
-  "miniso.sa": [
-    { "keyword": "منتجات يابانية", "volume": "12K", "difficulty": 45, "intent": "commercial", "cpc": "$0.80" }
-  ]
-}
+Provide a comprehensive JSON response with ALL of the following:
+
+1. "keywords": Map each domain to its top 50 TRUE SEO keywords (IGNORE UI words like "عرض", "المزيد", "سلة", "تسوق").
+   Each keyword needs: keyword, volume (e.g. "12K"), difficulty (1-100), intent ("informational"/"navigational"/"commercial"/"transactional"), cpc (e.g. "$0.80")
+
+2. "serpFeatures": Array of 6 SERP features for this keyword. Each has: type ("featured_snippet"/"people_also_ask"/"video"/"image_pack"/"local_pack"/"shopping"), present (true/false based on whether this keyword likely triggers this feature)
+
+3. "searchIntent": The primary search intent for "${targetKeyword}" — one of: "informational", "commercial", "transactional", "navigational"
+
+4. "backlinkGaps": Array of 8 realistic Saudi/Arab websites that likely link to these competitors but not to the user. Each has: domain, authority (1-100), linksToCompetitor (number), linksToYou (0), opportunity ("high"/"medium"/"low")
+
+Respond with ONLY valid JSON. No markdown.
 `;
   try {
     const text = await callAI(prompt, apiKey, provider);
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    return {
+      keywords: parsed.keywords || {},
+      serpFeatures: parsed.serpFeatures || defaultResult.serpFeatures,
+      searchIntent: parsed.searchIntent || 'informational',
+      backlinkGaps: parsed.backlinkGaps || []
+    };
   } catch (e) {
-    console.warn("AI keyword extraction failed", e);
-    return {};
+    console.warn("AI full analysis failed, using defaults", e);
+    return defaultResult;
   }
 }
 
@@ -449,18 +473,18 @@ export async function analyzeCompetitor(
 
   if (competitorMetrics.length === 0) throw new CompetitorAnalysisError('فشل تحليل جميع المنافسين', 'ANALYSIS_FAILED');
 
-  // Use Semantic AI to extract TRUE keywords from the noisy TF-IDF data
+  // Use combined AI analysis for keywords, SERP features, intent, and backlinks
   const competitorsForAI = competitorMetrics.map(c => ({
     domain: c.domain,
     title: c.title,
     h1: c.headingStructure.h1,
-    frequentWords: c.keywordDensity.map(k => k.keyword).slice(0, 30) // Provide top 30 words as context
+    frequentWords: c.keywordDensity.map(k => k.keyword).slice(0, 30)
   }));
   
-  const aiExtractedKeywords = await extractTrueSEOKeywordsWithAI(competitorsForAI, apiKey, provider);
+  const aiAnalysis = await runFullAIAnalysis(competitorsForAI, targetKeyword, apiKey, provider);
   
   competitorMetrics.forEach(c => {
-    const extracted = aiExtractedKeywords[c.domain];
+    const extracted = aiAnalysis.keywords[c.domain];
     if (extracted && Array.isArray(extracted) && extracted.length > 0) {
       c.topKeywords = extracted.slice(0, 50).map((k: any, i: number) => ({
         keyword: k.keyword || c.keywordDensity[i]?.keyword || 'غير معروف',
@@ -472,7 +496,6 @@ export async function analyzeCompetitor(
         cpc: k.cpc || '$0.00'
       }));
     } else {
-      // Fallback if AI fails: filter out common UI words manually before using TF-IDF
       const uiWords = new Set(['عرض', 'المزيد', 'منتجات', 'سلة', 'تسوق', 'الكل', 'أضف', 'شراء']);
       const filtered = c.keywordDensity.filter(k => !uiWords.has(k.keyword));
       c.topKeywords = filtered.slice(0, 10).map((k, i) => ({
@@ -523,12 +546,11 @@ export async function analyzeCompetitor(
        };
     }),
     contentGaps,
-    backlinkGaps: [
-      { domain: 'sabq.org', authority: 85, linksToCompetitor: Math.round(Math.random() * 20 + 5), linksToYou: 0, opportunity: 'high' },
-      { domain: 'sayidaty.net', authority: 78, linksToCompetitor: Math.round(Math.random() * 15 + 3), linksToYou: 0, opportunity: 'high' },
-      { domain: 'almrsal.com', authority: 72, linksToCompetitor: Math.round(Math.random() * 10 + 2), linksToYou: 0, opportunity: 'medium' },
-      { domain: 'argaam.com', authority: 82, linksToCompetitor: Math.round(Math.random() * 8 + 1), linksToYou: 0, opportunity: 'medium' },
-      { domain: 'haraj.com.sa', authority: 91, linksToCompetitor: Math.round(Math.random() * 40 + 10), linksToYou: 0, opportunity: 'high' }
+    backlinkGaps: aiAnalysis.backlinkGaps.length > 0 ? aiAnalysis.backlinkGaps : [
+      { domain: 'sabq.org', authority: 85, linksToCompetitor: Math.round(Math.random() * 20 + 5), linksToYou: 0, opportunity: 'high' as const },
+      { domain: 'sayidaty.net', authority: 78, linksToCompetitor: Math.round(Math.random() * 15 + 3), linksToYou: 0, opportunity: 'high' as const },
+      { domain: 'almrsal.com', authority: 72, linksToCompetitor: Math.round(Math.random() * 10 + 2), linksToYou: 0, opportunity: 'medium' as const },
+      { domain: 'argaam.com', authority: 82, linksToCompetitor: Math.round(Math.random() * 8 + 1), linksToYou: 0, opportunity: 'medium' as const }
     ],
     trafficComparison: competitorMetrics.map(c => {
       const baseTraffic = parseInt(c.organicTraffic.replace(/K/g, '000').replace(/M/g, '000000')) || 5000;
@@ -552,12 +574,12 @@ export async function analyzeCompetitor(
     timestamp: new Date().toISOString(),
     serpAnalysis: comparison,
     marketOverview: {
-      totalResults: Math.round(Math.random() * 5000000 + 1000000),
+      totalResults: Math.round(competitorMetrics.reduce((a, b) => a + b.wordCount, 0) * 1500 + competitorMetrics[0]?.domainAuthority * 50000),
       avgDomainAuthority: Math.round(competitorMetrics.reduce((a, b) => a + b.domainAuthority, 0) / competitorMetrics.length),
       avgContentLength: Math.round(competitorMetrics.reduce((a, b) => a + b.wordCount, 0) / competitorMetrics.length),
       keywordDifficulty: Math.round(competitorMetrics[0]?.domainAuthority * 0.9 || 50),
-      serpFeatures: [],
-      searchIntent: 'informational'
+      serpFeatures: aiAnalysis.serpFeatures,
+      searchIntent: aiAnalysis.searchIntent
     },
     actionPlan
   };

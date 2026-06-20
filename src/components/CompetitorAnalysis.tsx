@@ -123,6 +123,10 @@ function IntentBadge({ intent }: { intent: string }) {
 
 function CompetitorCard({ competitor, rank }: { competitor: CompetitorMetrics; rank: number }) {
   const [expanded, setExpanded] = useState(false);
+  const [kwPage, setKwPage] = useState(0);
+  const KW_PER_PAGE = 10;
+  const totalKwPages = Math.ceil(competitor.topKeywords.length / KW_PER_PAGE);
+  const displayedKeywords = competitor.topKeywords.slice(kwPage * KW_PER_PAGE, (kwPage + 1) * KW_PER_PAGE);
   
   const rankColors = ['bg-yellow-100 text-yellow-700', 'bg-gray-100 text-gray-700', 'bg-amber-100 text-amber-700'];
   const rankColor = rank <= 3 ? rankColors[rank - 1] : 'bg-gray-50 text-gray-500';
@@ -173,6 +177,7 @@ function CompetitorCard({ competitor, rank }: { competitor: CompetitorMetrics; r
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
               <Target size={16} /> الكلمات المفتاحية الأفضل
+              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">{competitor.topKeywords.length} كلمة</span>
             </h4>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -187,7 +192,7 @@ function CompetitorCard({ competitor, rank }: { competitor: CompetitorMetrics; r
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {competitor.topKeywords.map((kw, i) => (
+                  {displayedKeywords.map((kw, i) => (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium text-gray-900">{kw.keyword}</td>
                       <td className="px-3 py-2 text-center">
@@ -211,6 +216,16 @@ function CompetitorCard({ competitor, rank }: { competitor: CompetitorMetrics; r
                 </tbody>
               </table>
             </div>
+            {/* Pagination */}
+            {totalKwPages > 1 && (
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <span className="text-xs text-gray-500">صفحة {kwPage + 1} من {totalKwPages} ({competitor.topKeywords.length} كلمة)</span>
+                <div className="flex gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); setKwPage(Math.max(0, kwPage - 1)); }} disabled={kwPage === 0} className="px-3 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-30">السابق</button>
+                  <button onClick={(e) => { e.stopPropagation(); setKwPage(Math.min(totalKwPages - 1, kwPage + 1)); }} disabled={kwPage >= totalKwPages - 1} className="px-3 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-30">التالي</button>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Technical Issues */}
@@ -579,6 +594,25 @@ export function CompetitorAnalysisDashboard({ report, isLoading, error }: Props)
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Executive Summary */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="font-bold text-gray-900 text-lg mb-3">ملخص تنفيذي</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <div className="text-blue-600 font-semibold mb-1">المنافسة</div>
+                <p className="text-gray-700">تم تحليل <strong>{serpAnalysis.competitors.length}</strong> منافس بمتوسط قوة نطاق <strong>{marketOverview.avgDomainAuthority}</strong> ومتوسط محتوى <strong>{marketOverview.avgContentLength.toLocaleString()}</strong> كلمة</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                <div className="text-green-600 font-semibold mb-1">الفرص</div>
+                <p className="text-gray-700">تم اكتشاف <strong>{serpAnalysis.keywordGaps.length}</strong> فجوة كلمات مفتاحية و <strong>{serpAnalysis.contentGaps.length}</strong> فجوة محتوى يمكنك استغلالها</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                <div className="text-amber-600 font-semibold mb-1">التوصية</div>
+                <p className="text-gray-700">صعوبة الكلمة <strong>{marketOverview.keywordDifficulty}</strong>/100 — {marketOverview.keywordDifficulty >= 70 ? 'منافسة شرسة، ركز على Long-tail' : marketOverview.keywordDifficulty >= 40 ? 'منافسة متوسطة، محتوى عميق سيفوز' : 'فرصة ذهبية، منافسة ضعيفة!'}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Winner Banner */}
           <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
             <Award size={32} className="text-amber-600" />
