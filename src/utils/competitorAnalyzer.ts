@@ -4,7 +4,7 @@
 
 import { supabase } from '../lib/supabase';
 import { sanitizeForPrompt } from './inputSanitizer';
-import { extractKeywordsTF, calculateArabicReadability, generateContentGaps } from './textAnalyzer';
+import { extractKeywordsTF, calculateArabicReadability, generateContentGaps, analyzeContentDepth, detectDuplicateContent, analyzeSentimentAndTone } from './textAnalyzer';
 
 // ===== TYPES =====
 // Keeping the same interfaces to maintain compatibility with CompetitorAnalysis.tsx UI
@@ -42,6 +42,10 @@ export interface CompetitorMetrics {
   keywordDensity: { keyword: string; density: number }[];
   technicalIssues: TechnicalIssue[];
   serpFeatures: SERPFeature[];
+  contentDepth: number; // Phase 5
+  duplicateRatio: number; // Phase 5
+  duplicateSnippets: string[]; // Phase 5
+  tone: string; // Phase 5
   lastUpdated: string;
 }
 
@@ -223,6 +227,13 @@ function calculateDeterministicMetrics(parsed: ParsedData, url: string, loadTime
   const readabilityScore = calculateArabicReadability(parsed.cleanText);
   const extractedKeywords = extractKeywordsTF(parsed.cleanText, 15);
   
+  // Phase 5: Content Audit
+  const totalHeadings = parsed.h1.length + parsed.h2.length + parsed.h3.length;
+  const keywordDensity = extractedKeywords.length > 0 ? extractedKeywords[0].density : 0;
+  const contentDepth = analyzeContentDepth(parsed.wordCount, keywordDensity, totalHeadings);
+  const duplicateCheck = detectDuplicateContent(parsed.cleanText);
+  const tone = analyzeSentimentAndTone(parsed.cleanText);
+  
   // Calculate On-Page SEO Power (Deterministic)
   let onPagePower = 0;
   onPagePower += parsed.hasSchema ? 10 : 0;
@@ -285,10 +296,14 @@ function calculateDeterministicMetrics(parsed: ParsedData, url: string, loadTime
     })),
     contentScore,
     readabilityScore,
-    keywordDensity: extractedKeywords.map(k => ({ keyword: k.keyword, density: k.density })),
+    keywordDensity: extractedKeywords,
     technicalIssues: parsed.technicalIssues,
     serpFeatures: [],
-    lastUpdated: new Date().toISOString().split('T')[0]
+    contentDepth,
+    duplicateRatio: duplicateCheck.duplicateRatio,
+    duplicateSnippets: duplicateCheck.snippets,
+    tone,
+    lastUpdated: new Date().toISOString()
   };
 }
 

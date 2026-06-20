@@ -670,6 +670,55 @@ export function CompetitorAnalysisDashboard({ report, isLoading, error }: Props)
       
       {activeTab === 'content' && (
         <div className="space-y-6">
+          {/* Phase 5: Deep Content Audit */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Shield size={18} className="text-blue-600" />
+              تدقيق المحتوى المتقدم (Content Audit)
+            </h3>
+            <div className="space-y-4">
+              {serpAnalysis.competitors.map((comp, i) => (
+                <div key={i} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-gray-800">{comp.domain}</span>
+                    <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">{comp.wordCount} كلمة</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-xs text-gray-500 mb-1">عمق المحتوى</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className={`h-2 rounded-full ${comp.contentDepth > 70 ? 'bg-green-500' : comp.contentDepth > 40 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${comp.contentDepth}%` }}></div>
+                        </div>
+                        <span className="text-sm font-bold">{comp.contentDepth}%</span>
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-xs text-gray-500 mb-1">تكرار المحتوى (Duplicate)</div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-sm font-bold ${comp.duplicateRatio < 20 ? 'text-green-600' : comp.duplicateRatio < 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                          {comp.duplicateRatio}% مكرر
+                        </span>
+                        {comp.duplicateSnippets?.length > 0 && (
+                          <span className="text-xs text-red-400" title={comp.duplicateSnippets[0]}>تفاصيل</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-xs text-gray-500 mb-1">نبرة المحتوى (Tone)</div>
+                      <span className={`text-sm font-bold px-2 py-0.5 rounded ${
+                        comp.tone === 'بيعي' ? 'bg-orange-100 text-orange-700' :
+                        comp.tone === 'ودود' ? 'bg-green-100 text-green-700' :
+                        comp.tone === 'معلوماتي' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>{comp.tone}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <ContentGapTable gaps={serpAnalysis.contentGaps} />
           
           {/* Content Score Comparison */}

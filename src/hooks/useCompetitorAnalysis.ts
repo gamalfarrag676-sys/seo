@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '../components/Toast';
 import { analyzeCompetitor, type FullCompetitorReport, CompetitorAnalysisError } from '../utils/competitorAnalyzer';
+import { useCompetitorHistory } from './useCompetitorHistory';
 
 interface UseCompetitorAnalysisReturn {
   report: FullCompetitorReport | null;
@@ -9,6 +10,7 @@ interface UseCompetitorAnalysisReturn {
   error: string | null;
   analyze: (input: string, yourUrl?: string) => Promise<void>;
   clearReport: () => void;
+  setReport: (report: FullCompetitorReport | null) => void;
 }
 
 export function useCompetitorAnalysis(
@@ -19,6 +21,7 @@ export function useCompetitorAnalysis(
   const [report, setReport] = useState<FullCompetitorReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { saveReport } = useCompetitorHistory();
 
   const analyze = useCallback(async (input: string, yourUrl?: string) => {
     if (!apiKey?.trim()) {
@@ -42,6 +45,9 @@ export function useCompetitorAnalysis(
       const result = await analyzeCompetitor(input, apiKey, provider, yourUrl);
       
       setReport(result);
+      // Auto-save history (fire and forget)
+      saveReport(result).catch(console.error);
+      
       toast.success('تم إكمال تحليل المنافسين! ✨');
     } catch (err: any) {
       let message = 'حدث خطأ غير متوقع';
@@ -93,5 +99,6 @@ export function useCompetitorAnalysis(
     error,
     analyze,
     clearReport,
+    setReport,
   };
 }

@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useApiKeys } from '../hooks/useApiKeys';
 import { useCompetitorAnalysis } from '../hooks/useCompetitorAnalysis';
+import { useCompetitorHistory } from '../hooks/useCompetitorHistory';
 import { CompetitorAnalysisDashboard } from '../components/CompetitorAnalysis';
 import { exportToCSV, exportToPDF } from '../utils/exportReport';
+import { History, Trash2, Eye } from 'lucide-react';
 
 export default function CompetitorAnalyzer() {
  const { apiKey, openaiKey, aiProvider } = useApiKeys();
  const currentKey = aiProvider === 'gemini' ? apiKey : openaiKey;
  
- const { report, isLoading, error, analyze } = useCompetitorAnalysis(
+ const { report, isLoading, error, analyze, setReport } = useCompetitorAnalysis(
   currentKey,
   aiProvider
  );
+ 
+ const { reports, isLoading: isHistoryLoading, deleteReport } = useCompetitorHistory();
  
  const [competitorUrls, setCompetitorUrls] = useState<string[]>(['']);
  const [yourUrl, setYourUrl] = useState('');
@@ -129,6 +133,42 @@ export default function CompetitorAnalyzer() {
      </button>
     </div>
    </div>
+
+   {/* History Section */}
+   {!report && reports.length > 0 && (
+    <div className="mb-8">
+     <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+      <History className="text-blue-600" />
+      التقارير السابقة
+     </h2>
+     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {reports.map((r) => (
+       <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
+        <div className="flex justify-between items-start mb-3">
+         <h3 className="font-bold text-lg text-gray-900 truncate pr-2" title={r.keyword}>{r.keyword}</h3>
+         <button onClick={() => deleteReport(r.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors">
+          <Trash2 size={16} />
+         </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
+         <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-semibold">{r.report_data.serpAnalysis?.competitors?.length || 0} منافسين</span>
+         {new Date(r.created_at).toLocaleDateString('ar-SA')}
+        </p>
+        <button 
+         onClick={() => {
+          setReport(r.report_data);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+         }}
+         className="w-full btn btn-secondary py-2 text-sm flex items-center justify-center gap-2"
+        >
+         <Eye size={16} />
+         عرض التقرير
+        </button>
+       </div>
+      ))}
+     </div>
+    </div>
+   )}
 
    {/* Results */}
    <div className="mt-8">

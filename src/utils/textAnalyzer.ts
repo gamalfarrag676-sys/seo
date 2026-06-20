@@ -112,3 +112,73 @@ export function generateContentGaps(competitorKeywords: string[][], targetKeywor
     }))
     .sort((a, b) => b.score - a.score);
 }
+
+// ===== PHASE 5: CONTENT AUDIT ALGORITHMS =====
+
+export function analyzeContentDepth(wordCount: number, keywordDensity: number, headingsCount: number): number {
+  // A heuristic for how deeply a topic is covered
+  let score = 0;
+  // Word count: max 40 points for 2000+ words
+  score += Math.min(40, (wordCount / 2000) * 40);
+  // Headings: max 30 points for 15+ headings (shows structured, deep content)
+  score += Math.min(30, (headingsCount / 15) * 30);
+  // Keyword density relevance: max 30 points (optimal density ~1-3%, too low or too high is bad)
+  const densityScore = keywordDensity >= 0.5 && keywordDensity <= 3.5 ? 30 : keywordDensity > 3.5 ? 10 : 15;
+  score += densityScore;
+  
+  return Math.min(100, Math.round(score));
+}
+
+export function detectDuplicateContent(text: string): { duplicateRatio: number; snippets: string[] } {
+  // Simple heuristic for internal duplication: split into sentences and find repeats
+  if (!text) return { duplicateRatio: 0, snippets: [] };
+  
+  const sentences = text.split(/[.!?،\n]+/).map(s => s.trim()).filter(s => s.length > 20);
+  if (sentences.length === 0) return { duplicateRatio: 0, snippets: [] };
+  
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  let duplicateSentences = 0;
+  
+  for (const s of sentences) {
+    if (seen.has(s)) {
+      duplicates.add(s);
+      duplicateSentences++;
+    } else {
+      seen.add(s);
+    }
+  }
+  
+  const ratio = Math.round((duplicateSentences / sentences.length) * 100);
+  return {
+    duplicateRatio: Math.min(100, ratio),
+    snippets: Array.from(duplicates).slice(0, 3) // Return top 3 duplicate snippets
+  };
+}
+
+export function analyzeSentimentAndTone(text: string): 'رسمي' | 'ودود' | 'بيعي' | 'معلوماتي' {
+  if (!text) return 'معلوماتي';
+  
+  const salesWords = ['اشتر', 'سعر', 'خصم', 'عروض', 'حصري', 'تسوق', 'سلة', 'منتج', 'رخيص'];
+  const formalWords = ['تعتبر', 'بناءً على', 'مما سبق', 'يُذكر', 'بالإضافة', 'لذلك', 'تشير'];
+  const friendlyWords = ['رأيك', 'أهلاً', 'دعنا', 'شاركنا', 'نصيحتنا', 'يا', 'معك'];
+  
+  let salesCount = 0;
+  let formalCount = 0;
+  let friendlyCount = 0;
+  
+  const words = text.split(/\s+/);
+  
+  for (const w of words) {
+    if (salesWords.some(s => w.includes(s))) salesCount++;
+    else if (formalWords.some(s => w.includes(s))) formalCount++;
+    else if (friendlyWords.some(s => w.includes(s))) friendlyCount++;
+  }
+  
+  const max = Math.max(salesCount, formalCount, friendlyCount);
+  if (max === 0 || (max === formalCount && formalCount < 3)) return 'معلوماتي';
+  
+  if (max === salesCount) return 'بيعي';
+  if (max === friendlyCount) return 'ودود';
+  return 'رسمي';
+}
