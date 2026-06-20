@@ -498,7 +498,7 @@ function TrafficChart({ data }: { data: { domain: string; data: { month: string;
 // ===== MAIN COMPONENT =====
 
 export function CompetitorAnalysisDashboard({ report, isLoading, error }: Props) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'keywords' | 'content' | 'backlinks' | 'action'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'compare' | 'keywords' | 'content' | 'backlinks' | 'action'>('overview');
   
   if (isLoading) {
     return (
@@ -526,6 +526,7 @@ export function CompetitorAnalysisDashboard({ report, isLoading, error }: Props)
   
   const tabs = [
     { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
+    { id: 'compare', label: 'مقارنة', icon: Shield },
     { id: 'keywords', label: 'الكلمات', icon: Target },
     { id: 'content', label: 'المحتوى', icon: FileText },
     { id: 'backlinks', label: 'الروابط', icon: Link2 },
@@ -748,6 +749,79 @@ export function CompetitorAnalysisDashboard({ report, isLoading, error }: Props)
         </div>
       )}
       
+      {activeTab === 'compare' && serpAnalysis.competitors.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Shield size={18} className="text-blue-600" />
+              مقارنة جنباً لجنب (Side-by-Side)
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">مقارنة شاملة بين جميع المنافسين</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-36">المعيار</th>
+                  {serpAnalysis.competitors.map((c, i) => (
+                    <th key={i} className="px-4 py-3 text-center text-xs font-semibold text-gray-600">
+                      <div className="flex flex-col items-center gap-1">
+                        <Globe size={14} className="text-gray-400" />
+                        {c.domain}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[
+                  { label: 'قوة النطاق (DA)', key: 'domainAuthority', best: 'max' },
+                  { label: 'الزيارات العضوية', key: 'organicTraffic', best: 'none' },
+                  { label: 'نقاط المحتوى', key: 'contentScore', best: 'max' },
+                  { label: 'عدد الكلمات', key: 'wordCount', best: 'max' },
+                  { label: 'الروابط الخلفية', key: 'backlinks', best: 'none' },
+                  { label: 'الروابط الداخلية', key: 'internalLinks', best: 'max' },
+                  { label: 'الروابط الخارجية', key: 'externalLinks', best: 'max' },
+                  { label: 'الصور', key: 'images', best: 'max' },
+                  { label: 'سرعة التحميل (s)', key: 'loadTime', best: 'min' },
+                  { label: 'SSL', key: 'hasSSL', best: 'bool' },
+                  { label: 'Schema', key: 'hasSchema', best: 'bool' },
+                  { label: 'الكلمات المفتاحية', key: 'topKeywordsCount', best: 'max' },
+                ].map((row) => {
+                  const values = serpAnalysis.competitors.map((c: any) => {
+                    if (row.key === 'topKeywordsCount') return c.topKeywords?.length || 0;
+                    return c[row.key];
+                  });
+                  const numValues = values.map((v: any) => typeof v === 'number' ? v : parseFloat(v) || 0);
+                  const bestVal = row.best === 'max' ? Math.max(...numValues) : row.best === 'min' ? Math.min(...numValues) : null;
+                  
+                  return (
+                    <tr key={row.key} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-700">{row.label}</td>
+                      {values.map((val: any, i: number) => {
+                        const numVal = typeof val === 'number' ? val : parseFloat(val) || 0;
+                        const isBest = row.best === 'bool' ? val === true : bestVal !== null && numVal === bestVal;
+                        return (
+                          <td key={i} className="px-4 py-3 text-center">
+                            <span className={`font-semibold ${isBest ? 'text-green-600' : 'text-gray-700'}`}>
+                              {row.best === 'bool' ? (
+                                val ? <CheckCircle size={16} className="text-green-500 mx-auto" /> : <XCircle size={16} className="text-red-400 mx-auto" />
+                              ) : (
+                                typeof val === 'number' ? val.toLocaleString() : val
+                              )}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'action' && (
         <ActionPlan actions={actionPlan} />
       )}

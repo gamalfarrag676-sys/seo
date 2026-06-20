@@ -122,6 +122,23 @@ async function scrapeWithEdgeFunction(url: string): Promise<string> {
   }
 }
 
+async function fetchSitemap(domain: string): Promise<string[]> {
+  try {
+    const sitemapUrl = `https://${domain}/sitemap.xml`;
+    const xml = await scrapeWithProxy(sitemapUrl);
+    
+    // Extract URLs using regex
+    const matches = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)];
+    const urls = matches.map(m => m[1]).filter(u => u.includes(domain) && !u.match(/\.(jpg|jpeg|png|gif|pdf|xml)$/i));
+    
+    // Get up to 3 random/first URLs
+    return urls.slice(0, 3);
+  } catch (e) {
+    console.warn("Failed to fetch sitemap for " + domain);
+    return [];
+  }
+}
+
 // ===== DETERMINISTIC DOM PARSER =====
 interface ParsedData {
   title: string;
@@ -434,20 +451,31 @@ export async function analyzeCompetitor(
   if (!input?.trim()) throw new CompetitorAnalysisError('يرجى إدخال كلمة مفتاحية أو رابط منافس', 'EMPTY_INPUT');
   if (!apiKey?.trim()) throw new CompetitorAnalysisError('مفتاح API غير موجود', 'MISSING_API_KEY');
 
-  const isUrl = isValidUrl(input);
+  // Support multiple URLs separated by ||| delimiter
+  const multiInputs = input.split('|||').map(s => s.trim()).filter(Boolean);
   let competitorUrls: string[] = [];
-  let targetKeyword = input;
+  let targetKeyword = multiInputs[0];
 
-  if (isUrl) {
-    competitorUrls = [input];
-    const urlObj = new URL(input);
-    const pathParts = urlObj.pathname.split('/').filter(Boolean);
-    targetKeyword = pathParts.length > 0 ? decodeURIComponent(pathParts[pathParts.length - 1]).replace(/-/g, ' ') : urlObj.hostname;
-  } else {
-    // If keyword provided, use AI to fetch 3 realistic top URLs
-    const prompt = `For Arabic keyword "${sanitizeForPrompt(input, 100)}" in Saudi Arabia, list 3 realistic top-ranking domains. JSON format: {"urls": ["https://mawdoo3.com/...", "https://salla.sa/..."]}`;
+  const validUrls = multiInputs.filter(u => isValidUrl(u));
+  const keywords = multiInputs.filter(u => !isValidUrl(u));
+
+  if (validUrls.length > 0) {
+    competitorUrls = validUrls;
+    // Extract keyword from first URL path
+    try {
+      const urlObj = new URL(validUrls[0]);
+      const pathParts = urlObj.pathname.split('/').filter(Boolean);
+      targetKeyword = pathParts.length > 0 ? decodeURIComponent(pathParts[pathParts.length - 1]).replace(/-/g, ' ') : urlObj.hostname;
+    } catch { targetKeyword = validUrls[0]; }
+  }
+
+  if (keywords.length > 0) {
+    targetKeyword = keywords[0];
+    // Use AI to find competitor URLs for the keyword
+    const prompt = `For Arabic keyword "${sanitizeForPrompt(keywords[0], 100)}" in Saudi Arabia, list 3 realistic top-ranking domains. JSON format: {"urls": ["https://mawdoo3.com/...", "https://salla.sa/..."]}`;
     const text = await callAI(prompt, apiKey, provider);
-    competitorUrls = JSON.parse(text).urls || [];
+    const aiUrls = JSON.parse(text).urls || [];
+    competitorUrls = [...competitorUrls, ...aiUrls];
   }
 
   if (competitorUrls.length === 0) throw new CompetitorAnalysisError('لم يتم العثور على منافسين', 'NO_COMPETITORS');
@@ -461,7 +489,28 @@ export async function analyzeCompetitor(
       const html = await scrapeWithEdgeFunction(url);
       const loadTime = (performance.now() - startTime) / 1000;
       
-      const parsed = parseHTMLWithDOM(html, extractDomain(url));
+      const domain = extractDomain(url);
+      const parsed = parseHTMLWithDOM(html, domain);
+      
+      // Phase 4: Deep Scrape via Sitemap
+      const sitemapUrls = await fetchSitemap(domain);
+      let deepWordCount = parsed.wordCount;
+      let deepCleanText = parsed.cleanText;
+      
+      for (const subUrl of sitemapUrls) {
+        if (subUrl === url) continue;
+        try {
+          const subHtml = await scrapeWithEdgeFunction(subUrl);
+          const subParsed = parseHTMLWithDOM(subHtml, domain);
+          deepCleanText += ' ' + subParsed.cleanText;
+          deepWordCount += subParsed.wordCount;
+        } catch (e) {} // ignore subpage errors
+      }
+      
+      // Update parsed data with combined deep content
+      parsed.cleanText = deepCleanText;
+      parsed.wordCount = deepWordCount;
+
       const metrics = calculateDeterministicMetrics(parsed, url, loadTime);
       
       competitorMetrics.push(metrics);
